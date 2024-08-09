@@ -1,18 +1,18 @@
 package gpg
 
 import (
-	"bytes"
-	"encoding/base64"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"golang.org/x/crypto/ssh"
 	"os"
 	"os/exec"
 	"strings"
-
-	"golang.org/x/crypto/openpgp"
-	"golang.org/x/crypto/ssh"
 )
 
-// Config holds the configuration for GPG key generation
+// Config holds the configuration for key generation
 type Config struct {
 	Name       string
 	Email      string
@@ -20,14 +20,35 @@ type Config struct {
 	ExpiryDays int
 }
 
-// Key represents a GPG key pair
+// Key represents a key pair
 type Key struct {
-	PrivateKey string
-	PublicKey  string
+	GPGPrivateKey string
+	GPGPublicKey  string
+	SSHPrivateKey string
+	SSHPublicKey  string
 }
 
-// GenerateKey generates a new GPG key pair based on the provided configuration
-func GenerateKey(config *Config) (*Key, error) {
+// GenerateKeys generates both GPG and SSH key pairs
+func GenerateKeys(config *Config) (*Key, error) {
+	gpgKey, err := generateGPGKey(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate GPG key: %v", err)
+	}
+
+	sshKey, err := generateSSHKey(config.KeyLength)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate SSH key: %v", err)
+	}
+
+	return &Key{
+		GPGPrivateKey: gpgKey.GPGPrivateKey,
+		GPGPublicKey:  gpgKey.GPGPublicKey,
+		SSHPrivateKey: sshKey.SSHPrivateKey,
+		SSHPublicKey:  sshKey.SSHPublicKey,
+	}, nil
+}
+
+func generateGPGKey(config *Config) (*Key, error) {
 	// Create a temporary GPG home directory
 	tempDir, err := os.MkdirTemp("", "gpg-home")
 	if err != nil {
@@ -75,49 +96,43 @@ func GenerateKey(config *Config) (*Key, error) {
 		return nil, fmt.Errorf("failed to export private GPG key: %v", err)
 	}
 
-	// Export public key in OpenSSH format
-	publicKeyCmd := exec.Command("gpg", "--export", keyID)
+	// Export public key in ASCII armor format
+	publicKeyCmd := exec.Command("gpg", "--armor", "--export", keyID)
 	publicKeyCmd.Env = append(os.Environ(), "GNUPGHOME="+tempDir)
-	publicKeyData, err := publicKeyCmd.Output()
+	publicKey, err := publicKeyCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to export public GPG key: %v", err)
 	}
 
-	// Convert PGP public key to OpenSSH format
-	publicKey, err := convertToOpenSSH(publicKeyData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert public key to OpenSSH format: %v", err)
-	}
-
 	return &Key{
-		PrivateKey: string(privateKey),
-		PublicKey:  publicKey,
+		GPGPrivateKey: string(privateKey),
+		GPGPublicKey:  string(publicKey),
 	}, nil
 }
 
-func convertToOpenSSH(pgpPublicKey []byte) (string, error) {
-	// Read the PGP public key
-	entityList, err := openpgp.ReadKeyRing(bytes.NewReader(pgpPublicKey))
+func generateSSHKey(bits int) (*Key, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, bits)
 	if err != nil {
-		return "", fmt.Errorf("failed to read PGP key: %v", err)
+		return nil, fmt.Errorf("failed to generate RSA key: %v", err)
 	}
 
-	if len(entityList) == 0 {
-		return "", fmt.Errorf("no PGP keys found")
+	// Convert the private key to PEM format
+	privateKeyPEM := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 	}
+	privateKeyString := string(pem.EncodeToMemory(privateKeyPEM))
 
-	// Get the first key
-	entity := entityList[0]
-	publicKey := entity.PrimaryKey
-
-	// Convert to SSH public key
-	sshPublicKey, err := ssh.NewPublicKey(publicKey)
+	// Generate the public key
+	publicKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
 	if err != nil {
-		return "", fmt.Errorf("failed to create SSH public key: %v", err)
+		return nil, fmt.Errorf("failed to create public key: %v", err)
 	}
 
-	// Marshal the SSH public key to authorized_keys format
-	sshPublicKeyBytes := ssh.MarshalAuthorizedKey(sshPublicKey)
+	publicKeyString := string(ssh.MarshalAuthorizedKey(publicKey))
 
-	return string(sshPublicKeyBytes), nil
+	return &Key{
+		SSHPrivateKey: privateKeyString,
+		SSHPublicKey:  publicKeyString,
+	}, nil
 }

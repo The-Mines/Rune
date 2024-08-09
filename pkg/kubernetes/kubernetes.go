@@ -2,9 +2,9 @@ package kubernetes
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"os"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -19,11 +19,8 @@ type Config struct {
 	OutputFile string
 }
 
-// CreateSecret creates a new Kubernetes secret with the given name and data
-func CreateSecret(config *Config, secretName, privateKey string) error {
-	// Encode the private key
-	encodedPrivateKey := base64.StdEncoding.EncodeToString([]byte(privateKey))
-
+// CreateSecret creates a new Kubernetes secret with the given name and key data
+func CreateSecret(config *Config, secretName string, gpgPrivateKey, gpgPublicKey, sshPrivateKey, sshPublicKey string) error {
 	// Create the secret object
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -32,7 +29,10 @@ func CreateSecret(config *Config, secretName, privateKey string) error {
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			"private-key": []byte(encodedPrivateKey),
+			"id_rsa":     []byte(sshPrivateKey),
+			"id_rsa.pub": []byte(sshPublicKey),
+			"gpg-private-key": []byte(gpgPrivateKey),
+			"gpg-public-key":  []byte(gpgPublicKey),
 		},
 	}
 

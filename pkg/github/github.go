@@ -56,15 +56,15 @@ func (c *Client) CreateRepository(name string, description string, private bool)
 
 // AddDeployKey adds a deploy key to the specified repository
 func (c *Client) AddDeployKey(owner, repo, title, key string, readOnly bool) (*github.Key, error) {
-	ctx := context.Background()
-	deployKey := &github.Key{
-		Title:    github.String(title),
-		Key:      github.String(key),
-		ReadOnly: github.Bool(readOnly),
-	}
-	createdKey, _, err := c.client.Repositories.CreateKey(ctx, owner, repo, deployKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add deploy key: %v", err)
-	}
-	return createdKey, nil
+    ctx := context.Background()
+    deployKey := &github.Key{
+        Title:    github.String(title),
+        Key:      github.String(key),
+        ReadOnly: github.Bool(readOnly),
+    }
+    createdKey, _, err := c.client.Repositories.CreateKey(ctx, owner, repo, deployKey)
+    if err != nil {
+        return nil, fmt.Errorf("failed to add deploy key: %v", err)
+    }
+    return createdKey, nil
 }

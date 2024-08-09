@@ -68,13 +68,13 @@ func runBootstrap(cmd *cobra.Command, args []string) {
 	}
 
 	// GPG key generation
-	gpgConfig := gpg.Config{
+	gpgConfig := &gpg.Config{
 		Name:       gpgName,
 		Email:      gpgEmail,
 		KeyLength:  gpgKeyLength,
 		ExpiryDays: gpgExpiryDays,
 	}
-	key, err := gpg.GenerateKey(&gpgConfig)
+	key, err := gpg.GenerateKey(gpgConfig)
 	if err != nil {
 		log.Fatalf("GPG key generation failed: %v", err)
 	}

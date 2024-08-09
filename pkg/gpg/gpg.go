@@ -7,25 +7,33 @@ import (
 	"strings"
 )
 
+// Config holds the configuration for GPG key generation
+type Config struct {
+	Name       string
+	Email      string
+	KeyLength  int
+	ExpiryDays int
+}
+
 // Key represents a GPG key pair
 type Key struct {
 	PrivateKey string
 	PublicKey  string
 }
 
-// GenerateKey generates a new GPG key pair
-func GenerateKey() (*Key, error) {
+// GenerateKey generates a new GPG key pair based on the provided configuration
+func GenerateKey(config *Config) (*Key, error) {
 	// Generate key pair
 	cmd := exec.Command("gpg", "--batch", "--gen-key")
-	stdin := bytes.NewBufferString(`
+	stdin := bytes.NewBufferString(fmt.Sprintf(`
 Key-Type: RSA
-Key-Length: 4096
-Name-Real: Rune Tekton Bot
-Name-Email: rune-tekton-bot@example.com
-Expire-Date: 0
-%no-protection
-%commit
-`)
+Key-Length: %d
+Name-Real: %s
+Name-Email: %s
+Expire-Date: %d
+%%no-protection
+%%commit
+`, config.KeyLength, config.Name, config.Email, config.ExpiryDays))
 	cmd.Stdin = stdin
 
 	if err := cmd.Run(); err != nil {

@@ -1,12 +1,11 @@
 package gpg
 
 import (
-	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
-
 // Config holds the configuration for GPG key generation
 type Config struct {
 	Name       string
@@ -23,25 +22,24 @@ type Key struct {
 
 // GenerateKey generates a new GPG key pair based on the provided configuration
 func GenerateKey(config *Config) (*Key, error) {
-	// Generate key pair
-	cmd := exec.Command("gpg", "--batch", "--gen-key")
-	stdin := bytes.NewBufferString(fmt.Sprintf(`
-Key-Type: RSA
-Key-Length: %d
-Name-Real: %s
-Name-Email: %s
-Expire-Date: %d
-%%no-protection
-%%commit
-`, config.KeyLength, config.Name, config.Email, config.ExpiryDays))
-	cmd.Stdin = stdin
+	// Create a temporary GPG home directory
+	tempDir, err := os.MkdirTemp("", "gpg-home")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary GPG home: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
 
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to generate GPG key: %v", err)
+	// Generate key pair
+	cmd := exec.Command("gpg", "--batch", "--passphrase", "", "--quick-generate-key", config.Email, "rsa"+fmt.Sprint(config.KeyLength), "sign", fmt.Sprint(config.ExpiryDays)+"d")
+	cmd.Env = append(os.Environ(), "GNUPGHOME="+tempDir)
+	
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("failed to generate GPG key: %v, output: %s", err, output)
 	}
 
 	// Get the key ID of the newly generated key
 	keyIDCmd := exec.Command("gpg", "--list-secret-keys", "--with-colons")
+	keyIDCmd.Env = append(os.Environ(), "GNUPGHOME="+tempDir)
 	output, err := keyIDCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list GPG keys: %v", err)
@@ -64,7 +62,8 @@ Expire-Date: %d
 	}
 
 	// Export private key
-	privateKeyCmd := exec.Command("gpg", "--export-secret-keys", "--armor", keyID)
+	privateKeyCmd := exec.Command("gpg", "--batch", "--passphrase", "", "--pinentry-mode", "loopback", "--export-secret-keys", "--armor", keyID)
+	privateKeyCmd.Env = append(os.Environ(), "GNUPGHOME="+tempDir)
 	privateKey, err := privateKeyCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to export private GPG key: %v", err)
@@ -72,6 +71,7 @@ Expire-Date: %d
 
 	// Export public key
 	publicKeyCmd := exec.Command("gpg", "--export", "--armor", keyID)
+	publicKeyCmd.Env = append(os.Environ(), "GNUPGHOME="+tempDir)
 	publicKey, err := publicKeyCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to export public GPG key: %v", err)

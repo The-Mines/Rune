@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -85,6 +86,14 @@ func runBootstrap(cmd *cobra.Command, args []string) {
 		Namespace:  kubeNamespace,
 		OutputFile: outputFile,
 	}
+
+	// If kubeConfig is empty and outputFile is not set, create a default output file
+	if kubeConfig == "" && outputFile == "" {
+		defaultOutputFile := filepath.Join(".", "rune-secret.yaml")
+		k8sConfig.OutputFile = defaultOutputFile
+		fmt.Printf("No Kubernetes config or output file specified. Creating secret file: %s\n", defaultOutputFile)
+	}
+
 	if err := kubernetes.CreateSecret(&k8sConfig, "privatekey", key.PrivateKey); err != nil {
 		log.Fatalf("Failed to create Kubernetes secret: %v", err)
 	}

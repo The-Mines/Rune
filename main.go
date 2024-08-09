@@ -103,7 +103,7 @@ func runBootstrap(cmd *cobra.Command, args []string) {
 	if !found {
 		log.Fatalf("Invalid GitHub repository format. Use 'owner/repo'")
 	}
-	_, err = githubClient.AddDeployKey(owner, repo, "Rune Deploy Key", key.PublicKey, true)
+	_, err = githubClient.AddDeployKey(owner, repo, "Rune Deploy Key", strings.TrimSpace(key.PublicKey), true)
 	if err != nil {
 		log.Fatalf("Failed to add deploy key: %v", err)
 	}

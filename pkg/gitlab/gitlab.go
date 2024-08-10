@@ -38,9 +38,15 @@ func (c *GitLabClient) Authenticate() error {
 
 // AddDeployKey adds a deploy key to the specified repository
 func (c *GitLabClient) AddDeployKey(projectID, title, key string, readOnly bool) error {
+	// Try to convert projectID to int, if it fails, assume it's a project path
 	id, err := strconv.Atoi(projectID)
 	if err != nil {
-		return fmt.Errorf("invalid project ID: %v", err)
+		// If projectID is not a number, treat it as a project path
+		project, _, err := c.client.Projects.GetProject(projectID, &gitlab.GetProjectOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get project: %v", err)
+		}
+		id = project.ID
 	}
 
 	_, _, err = c.client.DeployKeys.AddDeployKey(id, &gitlab.AddDeployKeyOptions{

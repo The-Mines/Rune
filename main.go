@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/The-Mines/Rune/pkg/github"
@@ -13,6 +12,12 @@ import (
 	"github.com/The-Mines/Rune/pkg/gpg"
 	"github.com/The-Mines/Rune/pkg/kubernetes"
 )
+
+// VCSClient interface defines the common methods for VCS clients
+type VCSClient interface {
+	Authenticate() error
+	AddDeployKey(repo, title, key string, readOnly bool) error
+}
 
 func main() {
 	var rootCmd = &cobra.Command{
@@ -62,12 +67,9 @@ func runBootstrap(cmd *cobra.Command, args []string) {
 	outputFile, _ := cmd.Flags().GetString("output-file")
 
 	// VCS integration
-	var vcsClient interface {
-		Authenticate() error
-		AddDeployKey(string, string, string, bool) error
-	}
-
+	var vcsClient VCSClient
 	var err error
+
 	switch vcsType {
 	case "github":
 		vcsClient, err = github.NewClient(vcsToken)
@@ -116,21 +118,8 @@ func runBootstrap(cmd *cobra.Command, args []string) {
 	}
 
 	// Add the SSH public key as a deploy key to the repository
-	var deployKeyErr error
-	switch vcsType {
-	case "github":
-		owner, repo, found := strings.Cut(vcsRepo, "/")
-		if !found {
-			log.Fatalf("Invalid GitHub repository format. Use 'owner/repo'")
-		}
-		deployKeyErr = vcsClient.AddDeployKey(owner, repo, "Rune Deploy Key", keys.SSHPublicKey, true)
-	case "gitlab":
-		projectID := vcsRepo // For GitLab, vcsRepo should be the project ID
-		deployKeyErr = vcsClient.AddDeployKey(projectID, "Rune Deploy Key", keys.SSHPublicKey, true)
-	}
-
-	if deployKeyErr != nil {
-		log.Fatalf("Failed to add deploy key: %v", deployKeyErr)
+	if err := vcsClient.AddDeployKey(vcsRepo, "Rune Deploy Key", keys.SSHPublicKey, true); err != nil {
+		log.Fatalf("Failed to add deploy key: %v", err)
 	}
 
 	fmt.Println("VCS integration and Kubernetes secret setup completed successfully!")

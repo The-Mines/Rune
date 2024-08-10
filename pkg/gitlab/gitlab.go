@@ -1,7 +1,8 @@
-package gitlab // assume this is the package name, adjust if different
+package gitlab
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/xanzy/go-gitlab"
 )
@@ -36,12 +37,16 @@ func (c *GitLabClient) Authenticate() error {
 }
 
 // AddDeployKey adds a deploy key to the specified repository
-func (c *GitLabClient) AddDeployKey(projectID int, title, key string, readOnly bool) error {
-	_, _, err := c.client.DeployKeys.AddDeployKey(projectID, &gitlab.AddDeployKeyOptions{
-		Title:    gitlab.String(title),
-		Key:      gitlab.String(key),
-		CanPush:  gitlab.Bool(!readOnly),
-		ReadOnly: gitlab.Bool(readOnly),
+func (c *GitLabClient) AddDeployKey(projectID, title, key string, readOnly bool) error {
+	id, err := strconv.Atoi(projectID)
+	if err != nil {
+		return fmt.Errorf("invalid project ID: %v", err)
+	}
+
+	_, _, err = c.client.DeployKeys.AddDeployKey(id, &gitlab.AddDeployKeyOptions{
+		Title:   gitlab.String(title),
+		Key:     gitlab.String(key),
+		CanPush: gitlab.Bool(!readOnly),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to add deploy key: %v", err)

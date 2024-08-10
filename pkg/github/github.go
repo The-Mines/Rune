@@ -3,9 +3,13 @@ package github
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/google/go-github/v45/github"
 	"golang.org/x/oauth2"
 )
+
+// Rest of the file remains the same...
 
 // Client represents a GitHub client
 type Client struct {
@@ -39,32 +43,22 @@ func (c *Client) Authenticate() error {
 	return nil
 }
 
-// CreateRepository creates a new repository in the authenticated user's account
-func (c *Client) CreateRepository(name string, description string, private bool) (*github.Repository, error) {
-	ctx := context.Background()
-	repo := &github.Repository{
-		Name:        github.String(name),
-		Description: github.String(description),
-		Private:     github.Bool(private),
-	}
-	createdRepo, _, err := c.client.Repositories.Create(ctx, "", repo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create repository: %v", err)
-	}
-	return createdRepo, nil
-}
-
 // AddDeployKey adds a deploy key to the specified repository
-func (c *Client) AddDeployKey(owner, repo, title, key string, readOnly bool) (*github.Key, error) {
-    ctx := context.Background()
-    deployKey := &github.Key{
-        Title:    github.String(title),
-        Key:      github.String(key),
-        ReadOnly: github.Bool(readOnly),
-    }
-    createdKey, _, err := c.client.Repositories.CreateKey(ctx, owner, repo, deployKey)
-    if err != nil {
-        return nil, fmt.Errorf("failed to add deploy key: %v", err)
-    }
-    return createdKey, nil
+func (c *Client) AddDeployKey(repo, title, key string, readOnly bool) error {
+	ctx := context.Background()
+	parts := strings.Split(repo, "/")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid repository format, expected 'owner/repo'")
+	}
+	owner, repoName := parts[0], parts[1]
+
+	_, _, err := c.client.Repositories.CreateKey(ctx, owner, repoName, &github.Key{
+		Title:    github.String(title),
+		Key:      github.String(key),
+		ReadOnly: github.Bool(readOnly),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to add deploy key: %v", err)
+	}
+	return nil
 }

@@ -1,3 +1,4 @@
+// pkg/github/github.go
 package github
 
 import (

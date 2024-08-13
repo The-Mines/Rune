@@ -1,3 +1,4 @@
+// pkg/kubernetes/kubernetes.go
 package kubernetes
 
 import (

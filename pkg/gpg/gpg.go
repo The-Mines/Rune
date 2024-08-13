@@ -1,3 +1,4 @@
+// pkg/gpg/gpg.go
 package gpg
 
 import (

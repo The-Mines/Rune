@@ -22,19 +22,40 @@ type Config struct {
 
 // CreateSecret creates a new Kubernetes secret with the given name and key data
 func CreateSecret(config *Config, secretName string, gpgPrivateKey, gpgPublicKey, sshPrivateKey, sshPublicKey string) error {
+	if config == nil {
+		return fmt.Errorf("config cannot be nil")
+	}
+
+	if secretName == "" {
+		return fmt.Errorf("secretName cannot be empty")
+	}
+
 	// Create the secret object
 	secret := &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: config.Namespace,
 		},
 		Type: corev1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			"id_rsa":     []byte(sshPrivateKey),
-			"id_rsa.pub": []byte(sshPublicKey),
-			"gpg-private-key": []byte(gpgPrivateKey),
-			"gpg-public-key":  []byte(gpgPublicKey),
-		},
+		Data: map[string][]byte{},
+	}
+
+	// Only add non-empty keys to avoid creating empty entries
+	if sshPrivateKey != "" {
+		secret.Data["id_rsa"] = []byte(sshPrivateKey)
+	}
+	if sshPublicKey != "" {
+		secret.Data["id_rsa.pub"] = []byte(sshPublicKey)
+	}
+	if gpgPrivateKey != "" {
+		secret.Data["gpg-private-key"] = []byte(gpgPrivateKey)
+	}
+	if gpgPublicKey != "" {
+		secret.Data["gpg-public-key"] = []byte(gpgPublicKey)
 	}
 
 	// If OutputFile is specified or ConfigPath is empty, write the secret to a file
@@ -64,6 +85,10 @@ func CreateSecret(config *Config, secretName string, gpgPrivateKey, gpgPublicKey
 
 // writeSecretToFile writes the secret to a YAML file
 func writeSecretToFile(secret *corev1.Secret, filename string) error {
+	if filename == "" {
+		return fmt.Errorf("filename cannot be empty")
+	}
+
 	// Convert the secret to YAML
 	yamlData, err := yaml.Marshal(secret)
 	if err != nil {
@@ -71,7 +96,7 @@ func writeSecretToFile(secret *corev1.Secret, filename string) error {
 	}
 
 	// Write the YAML to a file
-	err = os.WriteFile(filename, yamlData, 0644)
+	err = os.WriteFile(filename, yamlData, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to write secret to file: %v", err)
 	}
